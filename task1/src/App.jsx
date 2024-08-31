@@ -1,69 +1,97 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import Web3 from "web3";
 
+const infuraUrl =
+  "https://sepolia.infura.io/v3/dd93d90dc8ae4f6d8d022375e9b4200a";
+const web3 = new Web3(new Web3.providers.HttpProvider(infuraUrl));
+
 const App = () => {
-  const infuraUrl =
-    "https://sepolia.infura.io/v3/dd93d90dc8ae4f6d8d022375e9b4200a";
-  const web3 = new Web3(new Web3.providers.HttpProvider(infuraUrl));
   const [block, setBlock] = useState(null);
-  const [walletAddress, setwalletAddress] = useState("");
+  const [walletAddress, setWalletAddress] = useState("");
   const [accountBalance, setAccountBalance] = useState("");
   const [calculator, setCalculator] = useState("ether");
+  const [loading, setLoading] = useState(false);
 
+  // Fetch the latest block number
   useEffect(() => {
-    web3.eth
-      .getBlockNumber()
-      .then((blockNumber) => {
-        console.log("Block number:", blockNumber); // Log block number
+    const fetchBlockNumber = async () => {
+      setLoading(true);
+      try {
+        const blockNumber = await web3.eth.getBlockNumber();
         setBlock(blockNumber);
-      })
-      .catch((error) => {
-        console.error("Error fetching block number:", error); // Log error
-      });
+      } catch (error) {
+        console.error("Error fetching block number:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchBlockNumber();
   }, []);
-  const getDetail = async (walletAddress) => {
-    console.log("wall", walletAddress);
-    try {
-      const balance = await web3.eth.getBalance(walletAddress);
-      console.log("balace", balance);
-      const tempaccountBalance = web3.utils.fromWei(balance, calculator);
-      console.log("tempcaccountbalace", tempaccountBalance);
-      setAccountBalance(tempaccountBalance);
-    } catch (error) {
-      console.log("error", error);
+
+  // Fetch account details
+  const getDetail = useCallback(
+    async (address) => {
+      if (!address) return;
+      console.log("calculattor", calculator);
+      setLoading(true);
+      try {
+        const balance = await web3.eth.getBalance(address);
+        const formattedBalance = web3.utils.fromWei(balance, calculator);
+        setAccountBalance(formattedBalance);
+      } catch (error) {
+        console.error("Error fetching account details:", error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [calculator]
+  );
+
+  // Handle address change
+  const handleAddressChange = (e) => {
+    const address = e.target.value;
+    setWalletAddress(address);
+    // Delay fetching balance until user stops typing
+    if (address) {
+      getDetail(address);
+    } else {
+      setAccountBalance("");
+    }
+  };
+
+  // Handle currency unit change
+  const handleUnitChange = (e) => {
+    const unit = e.target.value;
+    setCalculator(unit);
+    if (walletAddress) {
+      getDetail(walletAddress);
     }
   };
 
   return (
     <div>
       <h1>First Dapp</h1>
+      {loading && <p>Loading...</p>}
       <p>
-        {block !== null ? `Block Number: ${block}` : "Loading block number..."}
+        {block !== null ? `Block Number: ${block}` : "Fetching block number..."}
       </p>
       <p>
-        {accountBalance !== ""
-          ? `Account Balance in ether is : ${accountBalance}${calculator}`
-          : "please provide any address to get account balance..."}
+        {accountBalance
+          ? `Account Balance in ${calculator}: ${accountBalance}`
+          : "Please provide an address to get account balance..."}
       </p>
-      <select
-        onChange={(e) => {
-          setCalculator(e.target.value);
-          getDetail(walletAddress);
-        }}
-        value={calculator}
-      >
+      <select onChange={handleUnitChange} value={calculator}>
         <option value="ether">ETHER</option>
         <option value="gwei">GWEI</option>
-        <option value="wei">WEi</option>
+        <option value="wei">WEI</option>
       </select>
       <input
         type="text"
         value={walletAddress}
-        onChange={(e) => setwalletAddress(e.target.value)}
+        onChange={handleAddressChange}
+        placeholder="Enter wallet address"
       />
-      <button onClick={() => getDetail(walletAddress)}>
-        Get transaction details
-      </button>
     </div>
   );
 };
